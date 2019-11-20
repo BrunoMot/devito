@@ -1,90 +1,84 @@
-from devito import TimeFunction, Grid, Eq
-from devito.data.allocators import ExternalAllocator
-from utils import generate_data, external_initializer
 import numpy as np
 
-shape=(10,10)
-space_order=2
-time_order=2
-save=2
-numpy_array, devito_grid = generate_data(shape=shape, space_order=space_order, save=save)
-
-f1 = TimeFunction(name='f1', 
-                  grid=devito_grid, 
-                  space_order=space_order,
-                  allocator=ExternalAllocator(numpy_array), 
-                  initializer=external_initializer,
-                  time_order=time_order,
-                  save=save)
-
-# print(f1.data)
-equation = Eq(f1.forward, f1 + f1.backward + 1)
-# print(equation)
-
-##
-
-from devito.operator import Operator
+from devito import TimeFunction, Grid, Eq
+from devito.data.allocators import ExternalAllocator
 from devito.ir.equations import LoweredEq
+from devito.ir.iet import Expression, FindNodes, List
+from devito.ir.iet.visitors import Transformer
+from devito.operator import Operator
+from devito.symbolics import retrieve_indexed
+
+from devito.types import Symbol
+
+from utils import generate_data, external_initializer
+
 
 class InPlaceOperator(Operator):
 
     def __init__(self, *args, **kwargs):
         super(InPlaceOperator, self).__init__(*args, **kwargs)
 
-    def _specialize_exprs(self, expressions):
+    def _specialize_iet(self, iet, **kwargs):
 
-        expr_in = expressions[0]
-        mapping = []
-        exprs_out = []
+        in1 = Symbol(name='in1')
+        in2 = Symbol(name='in2')
+        out1 = Symbol(name='out1')
+        out2 = Symbol(name='out2')
 
-        from sympy import symbols
-        in1, in2, out1, out2 = symbols("in1, in2, out1, out2")
+        # extract expression from iet
+        expr_in = FindNodes(Expression).visit(iet)[0]
+        equation = expr_in.expr
 
-        from devito.symbolics import retrieve_indexed
-        symbols = retrieve_indexed(expr_in)
-        symbols_in_order = [symbols[1], symbols[2], symbols[0]]
-        extended_symbols_in_order = [in2, in1] + symbols_in_order + [out1, out2]
+        # extract symbols from equation
+        symb = retrieve_indexed(equation)
+        symb_ordered = [symb[1], symb[2], symb[0]] # TODO: func to order symb 
+        symb_ordered_ext = [in2, in1] + symb_ordered + [out1, out2]
 
+        # draw successive symbol shifts
         # first pass
-        mapping.append({extended_symbols_in_order[2]:extended_symbols_in_order[0],
-                        extended_symbols_in_order[3]:extended_symbols_in_order[1],
-                        extended_symbols_in_order[4]:extended_symbols_in_order[2]})
+        mapping = []
+        mapping.append({symb_ordered_ext[2]:symb_ordered_ext[0],
+                        symb_ordered_ext[3]:symb_ordered_ext[1],
+                        symb_ordered_ext[4]:symb_ordered_ext[2]})
+        # remaining passes
         for i in range(4):
-            mapping.append({extended_symbols_in_order[i+2]:extended_symbols_in_order[i+3],
-                            extended_symbols_in_order[i+1]:extended_symbols_in_order[i+2],
-                            extended_symbols_in_order[i+0]:extended_symbols_in_order[i+1]})
+            mapping.append({symb_ordered_ext[i+2]:symb_ordered_ext[i+3],
+                            symb_ordered_ext[i+1]:symb_ordered_ext[i+2],
+                            symb_ordered_ext[i+0]:symb_ordered_ext[i+1]})
 
-        tmp_expr = expr_in
+        # build list of output expressions
+        tmp_expr = equation
+        exprs_out = []
         for i in range(5):        
             tmp_expr = tmp_expr.xreplace(mapping[i])
-            exprs_out.append(tmp_expr)
+            exprs_out.append(Expression(tmp_expr))
 
-        # exprs_out.append(tmp_expr3)
+        # apply substitution and build output iet
+        mapper = {}
+        mapper[expr_in] = List(body=exprs_out)
+        iet = Transformer(mapper).visit(iet)
 
-        print("\nInput expr:\n %s\n\nOutput exprs:" % expr_in)
-        for n, i in enumerate(exprs_out):
-            print(" %s) %s" % (n+1,i))
+        return iet
 
-        # from slack
-        expected_strs = [\
-            "Eq(f1[time - 1, x, y], in1 + in2 + 1)", 
-            "Eq(f1[time, x, y], in1 + f1[time - 1, x, y] + 1)",
-            "Eq(f1[time + 1, x, y], f1[time, x, y] + f1[time - 1, x, y] + 1)",
-            "Eq(out1, f1[time, x, y] + f1[time - 1, x, y] + 1)",
-            "Eq(out2, f1[time, x, y] + out1 + 1)"]
+###
 
-        print ('\n*RESULT*')
-        for n, i in enumerate(exprs_out):
-            print (' %s:' % (n+1), end='')
-            try:
-                assert str(exprs_out[n]) == expected_strs[n]
-                print (' PASS')
-            except:
-                print(" FAIL\n\tExpected:\n\t %s\n\tReturned:\n\t %s" % \
-                    (expected_strs[n], exprs_out[n]))
+shape=(10,10)
+space_order=2
+time_order=2
+save=2
+numpy_array, devito_grid = generate_data(shape=shape, 
+                                         space_order=space_order, 
+                                         save=save)
 
-        # from IPython import embed; embed()
-        return [LoweredEq(i) for i in expressions]
+f1 = TimeFunction(name='f1',
+                  grid=devito_grid,
+                  space_order=space_order,
+                  allocator=ExternalAllocator(numpy_array),
+                  initializer=external_initializer,
+                  time_order=time_order,
+                  save=save)
 
+equation = Eq(f1.forward, f1 + f1.backward + 1)
 operator = InPlaceOperator(equation)
-# print(operator)
+
+print(operator)
