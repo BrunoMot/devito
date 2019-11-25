@@ -22,6 +22,7 @@ from devito.symbolics import indexify
 from devito.tools import (DAG, Signer, ReducerMap, as_tuple, flatten, filter_ordered,
                           filter_sorted, split)
 from devito.types import Dimension
+from devito.types.sparse import UnevaluatedSparseOperation
 
 __all__ = ['Operator']
 
@@ -129,10 +130,14 @@ class Operator(Callable):
     _default_globals = []
 
     def __init__(self, expressions, **kwargs):
+        expressions = evaluate(expressions)
+
         expressions = as_tuple(expressions)
 
         # Input check
         if any(not isinstance(i, Eq) for i in expressions):
+            from IPython import embed
+            embed()
             raise InvalidOperator("Only `devito.Eq` expressions are allowed.")
 
         self.name = kwargs.get("name", "Kernel")
@@ -753,3 +758,15 @@ def set_dle_mode(mode):
 
 def is_threaded(mode):
     return set_dle_mode(mode)[1].get('openmp', configuration['openmp'])
+
+def evaluate(collection):
+    expressions = []
+    for e in collection:
+        if isinstance(e, UnevaluatedSparseOperation):
+            subexpressions = e.evaluate
+        else:
+            subexpressions = [e]
+        
+        for se in subexpressions:
+            expressions.append(se)
+    return expressions
