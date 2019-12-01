@@ -4,9 +4,9 @@ import cgen as c
 import numpy as np
 from cached_property import cached_property
 
-from devito.ir.iet import (Expression, Iteration, List, FindAdjacent, FindNodes,
-                           IsPerfectIteration, Transformer, PARALLEL, AFFINE, make_efunc,
-                           compose_nodes, filter_iterations, retrieve_iteration_tree)
+from devito.ir import (Expression, Iteration, List, FindAdjacent, FindNodes,
+                       IsPerfectIteration, Transformer, PARALLEL, AFFINE, make_efunc,
+                       compose_nodes, filter_iterations, retrieve_iteration_tree)
 from devito.exceptions import InvalidArgument
 from devito.symbolics import as_symbol, xreplace_indices
 from devito.tools import all_equal, as_tuple, flatten
