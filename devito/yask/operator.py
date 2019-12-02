@@ -6,7 +6,7 @@ import numpy as np
 
 from devito.logger import yask as log
 from devito.ir.equations import LoweredEq
-from devito.ir.iet import (Expression, MetaCall, FindNodes, FindSymbols, Transformer,
+from devito.ir.iet import (Expression, FindNodes, FindSymbols, Transformer,
                            derive_parameters, find_affine_trees)
 from devito.ir.support import align_accesses
 from devito.operator import Operator
