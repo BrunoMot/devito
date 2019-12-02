@@ -39,12 +39,13 @@ class OperatorYASK(Operator):
         self._compiler = configuration.yask['compiler'].copy()
         self._compiler.libraries.extend([i.soname for i in self.yk_solns.values()])
 
-    def _specialize_exprs(self, expressions):
+    @classmethod
+    def _specialize_exprs(cls, expressions):
         # Align data accesses to the computational domain if not a yask.Function
         key = lambda i: i.is_DiscreteFunction and not i.from_YASK
         expressions = [align_accesses(e, key=key) for e in expressions]
 
-        expressions = super(OperatorYASK, self)._specialize_exprs(expressions)
+        expressions = super(OperatorYASK, cls)._specialize_exprs(cls, expressions)
 
         # No matter whether offloading will occur or not, all YASK vars accept
         # negative indices when using the get/set_element_* methods (up to the
@@ -112,10 +113,7 @@ class OperatorYASK(Operator):
         yk_var_objs.update({i: YaskVarObject(i) for i in self._local_vars})
         iet = make_var_accesses(iet, yk_var_objs)
 
-        # Finally optimize all non-yaskized loops
-        iet = super(OperatorYASK, self)._specialize_iet(iet, **kwargs)
-
-        return iet
+        return super(OperatorYASK, cls)._specialize_iet(cls, iet, **kwargs)
 
     @property
     def _local_vars(self):

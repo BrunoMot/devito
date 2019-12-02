@@ -9,13 +9,22 @@ from devito.targets.common import (Ompizer, avoid_denormals, insert_defs, insert
                                    loop_wrapping, simdize, parallelize_shm,
                                    minimize_remainders, hoist_prodders)
 
-__all__ = ['CPU64Rewriter', 'Intel64Rewriter', 'PowerRewriter', 'ArmRewriter',
-           'CustomRewriter']
+__all__ = ['CPU64NoopRewriter', 'CPU64Rewriter', 'Intel64Rewriter', 'PowerRewriter',
+           'ArmRewriter', 'CustomRewriter']
+#TODO: change all these Rewriter names
 
 
-class CPU64Rewriter(PlatformRewriter):
+class CPU64NoopRewriter(PlatformRewriter):
 
     _parallelizer_shm_type = Ompizer
+
+    def _pipeline(self, state):
+        # Symbol definitions
+        insert_defs(state)
+        insert_casts(state)
+
+
+class CPU64Rewriter(CPU64NoopRewriter):
 
     def _pipeline(self, state):
         # Optimization and parallelism

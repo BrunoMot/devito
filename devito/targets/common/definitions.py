@@ -10,7 +10,7 @@ import cgen as c
 from devito.ir import (ArrayCast, Element, Expression, List, LocalExpression,
                        FindNodes, MapExprStmts, Transformer)
 from devito.symbolics import ccode
-from devito.targets.rewriters import dle_pass  #TODO: Turn dle_pass into something else
+from devito.targets.common.rewriters import dle_pass  #TODO: Turn dle_pass into something else
 from devito.tools import as_tuple
 
 __all__ = ['insert_defs', 'insert_casts']
@@ -78,23 +78,16 @@ class Allocator(object):
 
 
 @dle_pass
-def insert_defs(iet, **kwargs):
+def insert_defs(iet):
     """
     Transform the input IET inserting the necessary symbol declarations.
     Declarations are placed as close as possible to the first symbol occurrence.
 
     Parameters
     ----------
-    iet : Node
+    iet : Callable
         The input Iteration/Expression tree.
-    external : tuple, optional
-        The symbols defined in some outer Callable, which therefore must not
-        be re-defined.
     """
-    external = kwargs.pop('external')
-
-    iet = as_tuple(iet)
-
     # Classify and then schedule declarations to stack/heap
     allocator = Allocator()
     for k, v in MapExprStmts().visit(iet).items():
@@ -115,12 +108,12 @@ def insert_defs(iet, **kwargs):
                     site = v if v else iet
                     allocator.push_object_on_stack(site[-1], i)
                 elif i.is_Array:
-                    if i in as_tuple(external):
-                        # The Array is defined in some other IET
+                    if i in iet.parameters:
+                        # The Array is passed as a Callable argument
                         continue
                     elif i._mem_stack:
                         # On the stack
-                        allocator.push_object_on_stack(iet[0], i)
+                        allocator.push_object_on_stack(iet, i)
                     else:
                         # On the heap
                         allocator.push_array_on_heap(i)
@@ -135,33 +128,31 @@ def insert_defs(iet, **kwargs):
     # Introduce declarations on the heap (if any)
     if allocator.onheap:
         decls, allocs, frees = zip(*allocator.onheap)
+        from IPython import embed; embed()
         iet = List(header=decls + allocs, body=iet, footer=frees)
 
-    return iet
+    return iet, {}
 
 
 @dle_pass
-def insert_casts(iet, **kwargs):
+def insert_casts(iet):
     """
     Transform the input IET inserting the necessary type casts.
     The type casts are placed at the top of the IET.
 
     Parameters
     ----------
-    iet : Node
+    iet : Callable
         The input Iteration/Expression tree.
-    parameters : tuple, optional
-        The symbol that might require casting.
     """
-    parameters = kwargs.pop('parameters')
-
     # Make the generated code less verbose: if a non-Array parameter does not
     # appear in any Expression, that is, if the parameter is merely propagated
     # down to another Call, then there's no need to cast it
     exprs = FindNodes(Expression).visit(iet)
     need_cast = {i for i in set().union(*[i.functions for i in exprs]) if i.is_Tensor}
-    need_cast.update({i for i in parameters if i.is_Array})
+    need_cast.update({i for i in iet.parameters if i.is_Array})
 
-    casts = [ArrayCast(i) for i in parameters if i in need_cast]
-    iet = List(body=casts + [iet])
-    return iet
+    casts = tuple(ArrayCast(i) for i in iet.parameters if i in need_cast)
+    iet = iet._rebuild(body=casts + iet.body)
+
+    return iet, {}

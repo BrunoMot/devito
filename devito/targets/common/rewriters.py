@@ -111,10 +111,10 @@ def avoid_denormals(iet):
     are normally flushed when using SSE-based instruction sets, except when
     compiling shared objects.
     """
-    header = [cgen.Comment('Flush denormal numbers to zero in hardware'),
+    header = (cgen.Comment('Flush denormal numbers to zero in hardware'),
               cgen.Statement('_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON)'),
-              cgen.Statement('_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON)')]
-    iet = List(header=header, body=iet)
+              cgen.Statement('_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON)'))
+    iet = iet._rebuild(body=(List(header=header),) + iet.body)
     return iet, {'includes': ('xmmintrin.h', 'pmmintrin.h')}
 
 
