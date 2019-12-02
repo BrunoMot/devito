@@ -163,14 +163,14 @@ class Operator(Callable):
         profiler = create_profile('timers')
         iet = profiler.instrument(iet)
 
-        # Wrap the IET as a Callable
+        # Wrap the IET with a Callable
         parameters = derive_parameters(iet, True)
         op = Callable(name, iet, 'int', parameters, ())
 
         # Lower IET to a Target-specific IET
         op, target_state = cls._specialize_iet(op, **kwargs)
 
-        # Setup the Operator state
+        # Make it an actual Operator
         op = Callable.__new__(cls, **op.args)
         Callable.__init__(op, **op.args)
 
@@ -207,21 +207,9 @@ class Operator(Callable):
 
         return op
 
-    @classmethod
-    def __new_from_callable__(cls, *args, **kwargs):
-        op = Callable.__new__(cls, *args, **kwargs)
-        Callable.__init__(op, *args, **kwargs)
-        return op
-
     def __init__(self, *args, **kwargs):
         # Bypass the silent call to __init__ triggered through the backends engine
         pass
-
-    def _rebuild(self, *args, **kwargs):
-        # Avoid infinitely-recursive compilation
-        body = kwargs.get('body', self.body)
-        return self.__class__.__new_from_callable__(self.name, body, self.retval,
-                                                    self.parameters, self.prefix)
 
     # Compilation
 

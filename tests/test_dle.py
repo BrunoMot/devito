@@ -11,8 +11,9 @@ from devito import (Grid, Function, TimeFunction, SparseTimeFunction, SubDimensi
                     Eq, Operator, solve, switchconfig)
 from devito.exceptions import InvalidArgument
 from devito.ir.equations import DummyEq
-from devito.ir.iet import (Call, Expression, Iteration, Conditional, FindNodes,
-                           FindSymbols, iet_analyze, retrieve_iteration_tree)
+from devito.ir.iet import (Call, Callable, Expression, Iteration, Conditional, FindNodes,
+                           FindSymbols, iet_analyze, derive_parameters,
+                           retrieve_iteration_tree)
 from devito.targets import BlockDimension, NThreads, NThreadsNonaffine, iet_lower
 from devito.targets.common.openmp import ParallelRegion
 from devito.tools import as_tuple
@@ -316,11 +317,14 @@ class TestNodeParallelism(object):
                                 exprs, expected, iters):
         scope = [fa, fb, fc, fd, t0, t1, t2, t3]
         node_exprs = [Expression(DummyEq(EVAL(i, *scope))) for i in exprs]
-        ast = iters[6](iters[7](node_exprs))
+        iet = iters[6](iters[7](node_exprs))
 
-        ast = iet_analyze(ast)
+        parameters = derive_parameters(iet, True)
+        iet = Callable('kernel', iet, 'int', parameters)
 
-        iet, _ = iet_lower(ast, mode='openmp')
+        iet = iet_analyze(iet)
+
+        iet, _ = iet_lower(iet, mode='openmp')
         iterations = FindNodes(Iteration).visit(iet)
         assert len(iterations) == len(expected)
 

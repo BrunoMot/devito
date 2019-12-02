@@ -11,7 +11,6 @@ from devito.ir import (ArrayCast, Element, Expression, List, LocalExpression,
                        FindNodes, MapExprStmts, Transformer)
 from devito.symbolics import ccode
 from devito.targets.common.rewriters import dle_pass  #TODO: Turn dle_pass into something else
-from devito.tools import as_tuple
 
 __all__ = ['insert_defs', 'insert_casts']
 
@@ -128,8 +127,7 @@ def insert_defs(iet):
     # Introduce declarations on the heap (if any)
     if allocator.onheap:
         decls, allocs, frees = zip(*allocator.onheap)
-        from IPython import embed; embed()
-        iet = List(header=decls + allocs, body=iet, footer=frees)
+        iet = iet._rebuild(body=List(header=decls+allocs, body=iet.body, footer=frees))
 
     return iet, {}
 
