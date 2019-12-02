@@ -40,5 +40,6 @@ class DeviceOffloadingRewriter(PlatformRewriter):
         hoist_prodders(state)
 
         # Symbol definitions
-        insert_defs(state)
-        insert_casts(state)
+        #TODO
+        #insert_defs(state)
+        #insert_casts(state)
