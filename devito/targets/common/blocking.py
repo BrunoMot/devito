@@ -9,10 +9,21 @@ from devito.ir import (Expression, Iteration, List, FindAdjacent, FindNodes,
                        compose_nodes, filter_iterations, retrieve_iteration_tree)
 from devito.exceptions import InvalidArgument
 from devito.symbolics import as_symbol, xreplace_indices
+from devito.targets.common.queue import dle_pass
 from devito.tools import all_equal, as_tuple, flatten
 from devito.types import IncrDimension, Scalar
 
-__all__ = ['Blocker', 'BlockDimension']
+__all__ = ['Blocker', 'BlockDimension', 'loop_blocking']
+
+
+@dle_pass
+def loop_blocking(iet, **kwargs):
+    """
+    Apply hierarchical loop blocking to PARALLEL Iteration trees.
+    """
+    blocker = kwargs.pop('blocker')
+
+    return blocker.make_blocking(iet)
 
 
 class Blocker(object):
