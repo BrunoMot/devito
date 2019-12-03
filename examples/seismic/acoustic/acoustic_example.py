@@ -6,7 +6,7 @@ from devito import Constant, Function, smooth, configuration
 from examples.seismic.acoustic import AcousticWaveSolver
 from examples.seismic import demo_model, AcquisitionGeometry
 
-
+print('teste')
 def acoustic_setup(shape=(50, 50, 50), spacing=(15.0, 15.0, 15.0),
                    tn=500., kernel='OT2', space_order=4, nbl=10,
                    preset='layers-isotropic', **kwargs):
