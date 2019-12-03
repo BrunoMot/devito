@@ -93,8 +93,8 @@ def insert_defs(iet):
         if k.is_Expression:
             if k.is_definition:
                 # On the stack
-                site = v if v else iet
-                allocator.push_scalar_on_stack(site[-1], k)
+                site = v[-1] if v else iet
+                allocator.push_scalar_on_stack(site, k)
                 continue
             objs = [k.write]
         elif k.is_Call:
@@ -104,8 +104,8 @@ def insert_defs(iet):
             try:
                 if i.is_LocalObject:
                     # On the stack
-                    site = v if v else iet
-                    allocator.push_object_on_stack(site[-1], i)
+                    site = v[-1] if v else iet
+                    allocator.push_object_on_stack(site, i)
                 elif i.is_Array:
                     if i in iet.parameters:
                         # The Array is passed as a Callable argument
