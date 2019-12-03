@@ -587,9 +587,9 @@ def test_minimize_reminders_due_to_autopadding():
     op0 = Operator(eqn, dse='noop', dle=('advanced', {'openmp': False}))
     op1 = Operator(eqn, dse='aggressive', dle=('advanced', {'openmp': False}))
 
-    x0_blk_size = op1.parameters[5]
-    y0_blk_size = op1.parameters[9]
-    z_size = op1.parameters[-1]
+    x0_blk_size = op1.parameters[-2]
+    y0_blk_size = op1.parameters[-1]
+    z_size = op1.parameters[4]
 
     # Check Array shape
     arrays = [i for i in FindSymbols().visit(op1._func_table['bf0'].root) if i.is_Array]
