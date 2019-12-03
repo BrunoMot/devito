@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 import cgen
 
 from devito.ir.iet import (Call, Iteration, List, HaloSpot, Prodder, PARALLEL,
