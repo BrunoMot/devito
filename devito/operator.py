@@ -749,26 +749,3 @@ def set_dle_mode(mode):
 
 def is_threaded(mode):
     return set_dle_mode(mode)[1].get('openmp', configuration['openmp'])
-
-def evaluate(collection):
-    expressions = []
-    if not isinstance(collection, Sequence):
-        if isinstance(collection, UnevaluatedSparseOperation):
-            return collection.evaluate
-        else:
-            return collection
-    
-    for e in collection:
-        if isinstance(e, UnevaluatedSparseOperation):
-            subexpressions = e.evaluate
-            assert(all(isinstance(i, Eq) for i in subexpressions))
-        else:
-            assert(isinstance(e, Eq))
-            subexpressions = [e]
-        
-        for se in subexpressions:
-            assert(isinstance(se, Eq))
-            expressions.append(se)
-    assert(all(isinstance(i, Eq) for i in expressions))
-    print(expressions)
-    return expressions
