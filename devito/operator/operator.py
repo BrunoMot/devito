@@ -128,6 +128,11 @@ class Operator(Callable):
     _default_globals = []
 
     def __new__(cls, expressions, **kwargs):
+        if expressions is None:
+            # Return a dummy Callable. This is exploited by unpickling. Users
+            # can't do anything useful with it
+            return super(Operator, cls).__new__(cls, **kwargs)
+
         expressions = as_tuple(expressions)
 
         # Input check
@@ -674,6 +679,9 @@ class Operator(Callable):
             return state
         else:
             return self.__dict__
+
+    def __getnewargs_ex__(self):
+        return (None,), {}
 
     def __setstate__(self, state):
         soname = state.pop('_soname', None)
