@@ -15,7 +15,8 @@ from devito.tools import (ReducerMap, flatten, prod, powerset,
 from devito.types.dense import DiscreteFunction, Function, SubFunction
 from devito.types.dimension import Dimension, ConditionalDimension, DefaultDimension
 from devito.types.basic import Symbol, Scalar
-from devito.types.sparse import UnevaluatedSparseOperation, LinearInterpolator
+from devito.interpolators import (Injection, Interpolation, LinearInterpolator,
+                                  PrecomputedInterpolator)
 
 __all__ = ['SparseFunction', 'SparseTimeFunction', 'PrecomputedSparseFunction',
            'PrecomputedSparseTimeFunction']
@@ -475,7 +476,7 @@ class SparseFunction(AbstractSparseFunction):
 
     def __init_finalize__(self, *args, **kwargs):
         super(SparseFunction, self).__init_finalize__(*args, **kwargs)
-        self.interpolator = LinearInterpolator(self.grid)
+        self.interpolator = LinearInterpolator(self.grid, self)
         # Set up sparse point coordinates
         coordinates = kwargs.get('coordinates', kwargs.get('coordinates_data'))
         if isinstance(coordinates, Function):
@@ -505,6 +506,51 @@ class SparseFunction(AbstractSparseFunction):
         return SparseDistributor(kwargs['npoint'], self._sparse_dim,
                                  kwargs['grid'].distributor)
 
+    @cached_property
+    def _point_symbols(self):
+        """Symbol for coordinate value in each dimension of the point."""
+        return tuple(Scalar(name='p%s' % d, dtype=self.dtype)
+                     for d in self.grid.dimensions)
+
+    @memoized_meth
+    def _index_matrix(self, offset):
+        # Note about the use of *memoization*
+        # Since this method is called by `_interpolation_indices`, using
+        # memoization avoids a proliferation of symbolically identical
+        # ConditionalDimensions for a given set of indirection indices
+
+        # List of indirection indices for all adjacent grid points
+        index_matrix = [tuple(idx + ii + offset for ii, idx
+                              in zip(inc, self._coordinate_indices))
+                        for inc in self._point_increments]
+
+        # A unique symbol for each indirection index
+        indices = filter_ordered(flatten(index_matrix))
+        points = OrderedDict([(p, Symbol(name='ii_%s_%d' % (self.name, i)))
+                              for i, p in enumerate(indices)])
+
+        return index_matrix, points
+
+    @cached_property
+    def _coordinate_symbols(self):
+        """Symbol representing the coordinate values in each dimension."""
+        p_dim = self.indices[-1]
+        return tuple([self.coordinates.indexify((p_dim, i))
+                      for i in range(self.grid.dim)])
+
+    @cached_property
+    def _coordinate_indices(self):
+        """Symbol for each grid index according to the coordinates."""
+        indices = self.grid.dimensions
+        return tuple([INT(sympy.Function('floor')((c - o) / i.spacing))
+                      for c, o, i in zip(self._coordinate_symbols, self.grid.origin,
+                                         indices[:self.grid.dim])])
+
+    @cached_property
+    def _point_increments(self):
+        """Index increments in each dimension for each point symbol."""
+        return tuple(product(range(2), repeat=self.grid.dim))
+    
     @property
     def coordinates(self):
         """The SparseFunction coordinates."""
@@ -686,12 +732,10 @@ class SparseFunction(AbstractSparseFunction):
         # `_dist_scatter` is here sent.
 
     def interpolate(self, *args, **kwargs):
-        return UnevaluatedSparseOperation(self, UnevaluatedSparseOperation.INTERPOLATE,
-                                          self.interpolator, args, kwargs)
+        return Interpolation(self.interpolator, args, kwargs)
 
     def inject(self, *args, **kwargs):
-        return UnevaluatedSparseOperation(self, UnevaluatedSparseOperation.INJECT,
-                                          self.interpolator, args, kwargs)   
+        return Injection(self.interpolator, args, kwargs)   
 
     # Pickling support
     _pickle_kwargs = AbstractSparseFunction._pickle_kwargs + ['coordinates_data']
@@ -905,7 +949,7 @@ class PrecomputedSparseFunction(AbstractSparseFunction):
         gridpoints = kwargs.get('gridpoints')
         interpolation_coeffs = kwargs.get('interpolation_coeffs')
 
-        self.interpolator = PrecomputedInterpolator(self.name, r, gridpoints, interpolation_coeffs)
+        self.interpolator = PrecomputedInterpolator(self, r, gridpoints, interpolation_coeffs)
         
     @property
     def gridpoints(self):
@@ -944,6 +988,12 @@ class PrecomputedSparseFunction(AbstractSparseFunction):
             return
 
         raise NotImplementedError
+
+    def interpolate(self, *args, **kwargs):
+        return Interpolation(self.interpolator, args, kwargs)
+
+    def inject(self, *args, **kwargs):
+        return Injection(self.interpolator, args, kwargs)   
 
 
 class PrecomputedSparseTimeFunction(AbstractSparseTimeFunction,

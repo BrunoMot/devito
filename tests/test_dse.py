@@ -558,8 +558,8 @@ class TestAliases(object):
                 [Eq(f.forward, deriv2 + f + e.forward.dx)])
 
         op = Operator(eqns)
-
         arrays = [i for i in FindSymbols().visit(op) if i.is_Array]
+        print(arrays)
         assert len(arrays) == 3
         assert all(i._mem_heap and not i._mem_external for i in arrays)
 

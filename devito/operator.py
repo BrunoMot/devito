@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, Sequence
 from functools import reduce
 from operator import mul
 from math import ceil
@@ -22,8 +22,7 @@ from devito.symbolics import indexify
 from devito.tools import (DAG, Signer, ReducerMap, as_tuple, flatten, filter_ordered,
                           filter_sorted, split)
 from devito.types import Dimension
-from devito.types.sparse import UnevaluatedSparseOperation
-
+from devito.interpolators import UnevaluatedSparseOperation
 __all__ = ['Operator']
 
 
@@ -130,15 +129,7 @@ class Operator(Callable):
     _default_globals = []
 
     def __init__(self, expressions, **kwargs):
-        expressions = evaluate(expressions)
-
         expressions = as_tuple(expressions)
-
-        # Input check
-        if any(not isinstance(i, Eq) for i in expressions):
-            from IPython import embed
-            embed()
-            raise InvalidOperator("Only `devito.Eq` expressions are allowed.")
 
         self.name = kwargs.get("name", "Kernel")
         subs = kwargs.get("subs", {})
@@ -166,7 +157,7 @@ class Operator(Callable):
 
         # Expression lowering: evaluation of derivatives, flatten vectorial equations,
         # indexification, substitution rules, specialization
-        expressions = [i.evaluate for i in expressions]
+        expressions = flatten([i.evaluate for i in expressions])
         expressions = [j for i in expressions for j in i._flatten]
         expressions = [indexify(i) for i in expressions]
         expressions = self._apply_substitutions(expressions, subs)
@@ -761,12 +752,23 @@ def is_threaded(mode):
 
 def evaluate(collection):
     expressions = []
+    if not isinstance(collection, Sequence):
+        if isinstance(collection, UnevaluatedSparseOperation):
+            return collection.evaluate
+        else:
+            return collection
+    
     for e in collection:
         if isinstance(e, UnevaluatedSparseOperation):
             subexpressions = e.evaluate
+            assert(all(isinstance(i, Eq) for i in subexpressions))
         else:
+            assert(isinstance(e, Eq))
             subexpressions = [e]
         
         for se in subexpressions:
+            assert(isinstance(se, Eq))
             expressions.append(se)
+    assert(all(isinstance(i, Eq) for i in expressions))
+    print(expressions)
     return expressions
