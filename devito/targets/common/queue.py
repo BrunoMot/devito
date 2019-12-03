@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from time import time
 
-from devito.ir.iet import Call, FindNodes
+from devito.ir.iet import Call, FindNodes, Transformer
 from devito.tools import DAG, as_tuple, filter_ordered
 
 __all__ = ['State', 'dle_pass']
