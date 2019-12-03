@@ -134,10 +134,7 @@ def mark_iteration_tilable(analysis):
     """
     for tree in analysis.trees:
         for n, i in enumerate(tree):
-            # An Iteration is TILABLE if:
-            # * it's PARALLEL, AND
-            # * it's AFFINE, AND
-            # * it's the root of a perfect Iteration nest
+            # An Iteration is TILABLE only if it's PARALLEL and AFFINE
             if PARALLEL not in analysis.properties.get(i, []):
                 continue
             if AFFINE not in analysis.properties.get(i, []):
@@ -154,6 +151,11 @@ def mark_iteration_tilable(analysis):
             # Likewise, it won't be marked TILABLE if at least one Iteration
             # is over a local SubDimension
             if any(j.dim.is_Sub and j.dim.local for j in tree):
+                continue
+
+            # If it induces dynamic bounds in any of the inner Iterations,
+            # then it's ruled out too
+            if any(d.is_lex_non_stmt for d in analysis.scopes[i].d_all):
                 continue
 
             analysis.update({i: TILABLE})
